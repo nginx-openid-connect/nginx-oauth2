@@ -1,0 +1,68 @@
+version: '3.4'
+
+networks:
+  mynetwork:
+    name: mynetwork
+    attachable: true
+
+services:
+
+  postgres:
+    container_name: idp-db
+    image: postgres:12.0
+    # volumes:
+    #   - type: bind
+    #     source: ./docker/build-context/data
+    #     target: /var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+    networks:
+      - mynetwork
+
+  keycloak:
+    container_name: idp-keycloak
+    image: jboss/keycloak:15.1.0
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_SCHEMA: public
+      DB_PASSWORD: password
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: password
+      # Uncomment the line below if you want to specify JDBC parameters. The parameter below is just an example, and it shouldn't be used in production without knowledge. It is highly recommended that you read the PostgreSQL JDBC driver documentation in order to use it.
+      #JDBC_PARAMS: "ssl=true"
+    ports:
+      - 8080:8080
+    depends_on:
+      - postgres
+    networks:
+      - mynetwork
+
+  nginx_plus_keycloak_ubuntu18.04:
+    container_name: nginx-oidc-keycloak
+    build:
+      context: ./
+      dockerfile: ./docker/docker-files/nginxplus-ubuntu18.04/Dockerfile
+    image: nginxplus_oidc_keycloak_ubuntu18.04
+    ports:
+      - 31000:31000
+    volumes:
+      - type: bind
+        source: ./
+        target: /etc/nginx/conf.d/
+      - type: bind
+        source: ./docker/build-context/nginx/test/
+        target: /etc/nginx/test/
+      - type: bind
+        source: ./docker/build-context/content
+        target: /usr/share/nginx/html/
+    depends_on:
+      - keycloak
+    networks:
+      - mynetwork
